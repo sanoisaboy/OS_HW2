@@ -214,6 +214,36 @@ void externalCommand()
     printf("===== parent process end=====\n");
     return;
 }
+void runInBackground()
+{
+    pid_t pid = fork();
+
+    if (pid < 0)
+    {
+        perror("Fork failed");
+        exit(EXIT_FAILURE);
+    }
+    else if (pid > 0)
+    {
+        // 父進程退出
+        // exit(EXIT_SUCCESS);
+        return;
+    }
+
+    // 子進程設置為新的會話組長
+    if (setsid() < 0)
+    {
+        perror("Setsid failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // 更換到想要執行的程序
+    // execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
+    execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
+
+    perror("Exec failed");
+    exit(EXIT_FAILURE);
+}
 
 int main()
 {
@@ -267,7 +297,8 @@ int main()
         }
         else if (strcmp(commandType, "external") == 0)
         {
-            externalCommand();
+            // externalCommand();
+            runInBackground();
         }
         else if (strcmp(commandType, "exit") == 0)
         {
