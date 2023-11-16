@@ -1,9 +1,7 @@
 #include <stdio.h>
-
+#include <unistd.h>
 int main()
 {
-    for (int i = 0; i < 1000000000; i++)
-    {
-    }
+    sleep(5);
     return 0;
 }

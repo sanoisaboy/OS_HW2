@@ -5,10 +5,17 @@
 #include <libgen.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <signal.h>
 int commandMode = 1;
 char cwd[1024];
 char rootDir[1024];
 char parentDir[1024];
+
+void sighandler(int signo)
+{
+    signal(SIGTSTP, sighandler);
+    printf("Cannot execute Ctrl+Z\n");
+}
 
 char *currentDir(char *dir)
 {
@@ -198,51 +205,57 @@ void echo(char *word)
     printf("%s\n", word);
 }
 
-void externalCommand()
+void externalCommand(char *command)
 {
-    printf("====parent process start=====\n");
-    if (fork() == 0)
+    pid_t pid = fork();
+    // printf("====parent process start=====\n");
+    if (pid == 0)
     {
-        printf("i am child process\n");
-        execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
-
-        printf("====child process end=====\n");
-        return;
+        // setpgid(0, 0);
+        // signal(SIGTSTP, sighandler);
+        //   setpgid(0, 0);
+        // printf("i am child process\n");
+        // execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
+        // execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
+        execlp("/bin/sleep", "sleep", "5", NULL);
+        perror("execlp");
+        exit(EXIT_FAILURE);
     }
-
-    wait(NULL);
-    printf("===== parent process end=====\n");
+    else
+    {
+        // printf("Parent process: PID=%d\n", getpid());
+        int status;
+        waitpid(pid, &status, 0);
+        //  printf("%s\n", command);
+        //  printf("background");
+    }
+    // printf("===== parent process end=====\n");
     return;
 }
 void runInBackground()
 {
-    pid_t pid = fork();
 
-    if (pid < 0)
+    if (fork() == 0)
     {
-        perror("Fork failed");
+        // Child process
+        // printf("Child process: PID=%d, PPID=%d\n", getpid(), getppid());
+        execlp("/bin/sleep", "sleep", "5", NULL);
+        // execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
+        perror("execlp");
         exit(EXIT_FAILURE);
     }
-    else if (pid > 0)
+    else
     {
-        // 父進程退出
-        // exit(EXIT_SUCCESS);
-        return;
-    }
-
-    // 子進程設置為新的會話組長
-    if (setsid() < 0)
-    {
-        perror("Setsid failed");
-        exit(EXIT_FAILURE);
+        // Parent process
+        // printf("Parent process: PID=%d\n", getpid());
     }
 
     // 更換到想要執行的程序
     // execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
-    execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
 
-    perror("Exec failed");
-    exit(EXIT_FAILURE);
+    // perror("Exec failed");
+    // exit(EXIT_FAILURE);
+    return;
 }
 
 int main()
@@ -266,7 +279,10 @@ int main()
         }
         // printf("%ld\n", len);
         char *commandType = strtok(command, " ");
-        //   printf("%d\n", strcmp(command, "export"));
+        // char *exeName = strtok(command, "./");
+        printf("%s\n", commandType);
+        // printf("%s\n", exeName);
+        //     printf("%d\n", strcmp(command, "export"));
         if (strcmp(commandType, "pwd") == 0)
         {
             pwd();
@@ -295,10 +311,15 @@ int main()
             word[strlen(word)] = '\0';
             echo(word);
         }
-        else if (strcmp(commandType, "external") == 0)
+        else if (strstr(command, "./"))
         {
-            // externalCommand();
-            runInBackground();
+            // printf("%s\n", strtok(NULL, " "));
+            // externalCommand(strtok(NULL, " "));
+            // printf("%s\n", strstr(command, " t"));
+            if (!strtok(NULL, " "))
+                externalCommand(strtok(NULL, " "));
+            else
+                runInBackground();
         }
         else if (strcmp(commandType, "exit") == 0)
         {
