@@ -6,6 +6,7 @@
 #include <time.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <fcntl.h>
 int commandMode = 1;
 char cwd[1024];
 char rootDir[1024];
@@ -205,6 +206,34 @@ void echo(char *word)
     printf("%s\n", word);
 }
 
+void output()
+{
+    int fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1)
+    {
+        perror("open");
+        exit(EXIT_FAILURE);
+    }
+
+    // Redirect standard output to the file descriptor
+    if (dup2(fd, 1) == -1)
+    {
+        perror("dup2");
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    // Close the file descriptor (not needed after redirection)
+    close(fd);
+
+    // Now, anything written to standard output will be directed to "output.txt"
+    // execlp("ls", "ls", NULL);
+    execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
+    // If execlp fails
+    perror("execlp");
+    exit(EXIT_FAILURE);
+}
+
 void externalCommand(char *command)
 {
     pid_t pid = fork();
@@ -217,9 +246,14 @@ void externalCommand(char *command)
         // printf("i am child process\n");
         // execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
         // execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
+
+        // test > function
+        output();
+        /*
         execlp("/bin/sleep", "sleep", "5", NULL);
         perror("execlp");
         exit(EXIT_FAILURE);
+        */
     }
     else
     {
