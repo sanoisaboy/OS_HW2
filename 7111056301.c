@@ -7,16 +7,12 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <fcntl.h>
+
 int commandMode = 1;
 char cwd[1024];
 char rootDir[1024];
 char parentDir[1024];
-
-void sighandler(int signo)
-{
-    signal(SIGTSTP, sighandler);
-    printf("Cannot execute Ctrl+Z\n");
-}
+extern char **environ;
 
 char *currentDir(char *dir)
 {
@@ -44,7 +40,6 @@ void printPrompt()
     char *username = getenv("USER");
     if (username != NULL)
     {
-        // printf("Current user: %s\n", username);
     }
     else
     {
@@ -54,7 +49,6 @@ void printPrompt()
     char hostname[256];
     if (gethostname(hostname, sizeof(hostname)) == 0)
     {
-        // printf("Computer name (hostname): %s\n", hostname);
     }
     else
     {
@@ -124,29 +118,31 @@ void pwd()
 
 void export(char *word)
 {
-    char *env;
-    char *varible;
+    char *variable;
     char *path;
-    printf("%s", word);
-    varible = strtok(word, "=");
-    path = strtok(NULL, " ");
 
-    if (setenv(varible, path, 1) == 0)
+    if (word == NULL)
     {
-        // printf("set success");
+        // 當 word 為 NULL 時，獲取所有環境變數
+        char **env = environ;
+        while (*env != NULL)
+        {
+            printf("%s\n", *env);
+            env++;
+        }
     }
     else
     {
-        printf("set env error");
-    }
-    env = getenv(varible);
-    if (env != NULL)
-    {
-        printf("%s=%s\n", varible, env);
-    }
-    else
-    {
-        printf("get path error");
+        variable = strtok(word, "=");
+        path = strtok(NULL, " ");
+
+        if (setenv(variable, path, 1) == 0)
+        {
+        }
+        else
+        {
+            printf("Set environment variable error\n");
+        }
     }
 }
 
@@ -174,7 +170,7 @@ void date()
 
     printf("%s\n", output);
 }
-void echo(char *word)
+void echoFunction(char *word)
 {
     // printf("%s\n", word);
     if (word == NULL)
@@ -206,16 +202,19 @@ void echo(char *word)
     printf("%s\n", word);
 }
 
-void output()
+void output(char *path, char *exeName, char *fileName)
 {
-    int fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd;
+    if (!fileName)
+        fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    else
+        fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd == -1)
     {
         perror("open");
         exit(EXIT_FAILURE);
     }
 
-    // Redirect standard output to the file descriptor
     if (dup2(fd, 1) == -1)
     {
         perror("dup2");
@@ -223,100 +222,106 @@ void output()
         exit(EXIT_FAILURE);
     }
 
-    // Close the file descriptor (not needed after redirection)
     close(fd);
 
-    // Now, anything written to standard output will be directed to "output.txt"
-    // execlp("ls", "ls", NULL);
-    execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
-    // If execlp fails
+    execlp(path, exeName, NULL);
+
     perror("execlp");
     exit(EXIT_FAILURE);
 }
 
 void externalCommand(char *command)
 {
+
     pid_t pid = fork();
-    // printf("====parent process start=====\n");
+    char *path = malloc(strlen(cwd) + 1 + strlen(command) + 1);
+    strcpy(path, cwd);
+    strcat(path, "/");
+    strcat(path, command);
+
     if (pid == 0)
     {
-        // setpgid(0, 0);
-        // signal(SIGTSTP, sighandler);
-        //   setpgid(0, 0);
-        // printf("i am child process\n");
-        // execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
-        // execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
 
-        // test > function
-        output();
-        /*
-        execlp("/bin/sleep", "sleep", "5", NULL);
+        execlp(path, command, NULL);
+
         perror("execlp");
         exit(EXIT_FAILURE);
-        */
     }
     else
     {
-        // printf("Parent process: PID=%d\n", getpid());
+
         int status;
         waitpid(pid, &status, 0);
-        //  printf("%s\n", command);
-        //  printf("background");
     }
-    // printf("===== parent process end=====\n");
+    free(path);
     return;
 }
-void runInBackground()
+void runInBackground(char *command)
 {
 
+    char *path = malloc(strlen(cwd) + 1 + strlen(command) + 1);
+    strcpy(path, cwd);
+    strcat(path, "/");
+    strcat(path, command);
     if (fork() == 0)
     {
-        // Child process
-        // printf("Child process: PID=%d, PPID=%d\n", getpid(), getppid());
-        execlp("/bin/sleep", "sleep", "5", NULL);
-        // execlp("/Users/sanoisaboy/OS_HW2/loop", "loop", NULL);
+
+        execlp(path, command, NULL);
         perror("execlp");
         exit(EXIT_FAILURE);
     }
     else
     {
-        // Parent process
-        // printf("Parent process: PID=%d\n", getpid());
+    }
+    free(path);
+    return;
+}
+
+void runOutput(char *command, char *fileName)
+{
+
+    char *path = malloc(strlen(cwd) + 1 + strlen(command) + 1);
+    strcpy(path, cwd);
+    strcat(path, "/");
+    strcat(path, command);
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+
+        output(path, command, fileName);
+    }
+    else
+    {
+
+        int status;
+        waitpid(pid, &status, 0);
     }
 
-    // 更換到想要執行的程序
-    // execlp("/Users/sanoisaboy/OS_HW2/add", "add", "6", "4", NULL);
-
-    // perror("Exec failed");
-    // exit(EXIT_FAILURE);
+    free(path);
     return;
 }
 
 int main()
 {
-    // date();
+
     char command[100];
 
     getcwd(rootDir, sizeof(rootDir));
     while (commandMode == 1)
     {
+
         printPrompt();
+
         fgets(command, 100, stdin);
-        // scanf("[^\n]s", command);
-        //  printf("%s\n", &command);
-        // printf("%s", command);
-        //  changeDirectory(&command);
+
         size_t len = strlen(command);
         if (len > 0 && command[len - 1] == '\n')
         {
             command[len - 1] = '\0';
         }
-        // printf("%ld\n", len);
+
         char *commandType = strtok(command, " ");
-        // char *exeName = strtok(command, "./");
-        printf("%s\n", commandType);
-        // printf("%s\n", exeName);
-        //     printf("%d\n", strcmp(command, "export"));
+
         if (strcmp(commandType, "pwd") == 0)
         {
             pwd();
@@ -329,7 +334,6 @@ int main()
         else if (strcmp(commandType, "export") == 0)
         {
             export(strtok(NULL, " "));
-            printf("%s", strtok(NULL, " "));
         }
         else if (strcmp(commandType, "echo") == 0)
         {
@@ -343,27 +347,37 @@ int main()
                 token = strtok(NULL, " ");
             }
             word[strlen(word)] = '\0';
-            echo(word);
+            echoFunction(word);
         }
-        else if (strstr(command, "./"))
+        else if (strncmp(command, "./", 2) == 0)
         {
-            // printf("%s\n", strtok(NULL, " "));
-            // externalCommand(strtok(NULL, " "));
-            // printf("%s\n", strstr(command, " t"));
-            if (!strtok(NULL, " "))
-                externalCommand(strtok(NULL, " "));
-            else
-                runInBackground();
+
+            char *token;
+            token = strtok(NULL, " ");
+
+            char *slashPosition = strchr(command, '/') + 1;
+
+            if (!token)
+                externalCommand(slashPosition);
+            else if (strcmp(token, "&") == 0)
+
+                runInBackground(slashPosition);
+
+            else if (strcmp(token, ">") == 0)
+            {
+
+                runOutput(slashPosition, strtok(NULL, " "));
+            }
         }
         else if (strcmp(commandType, "exit") == 0)
         {
             break;
         }
-
-        // printf("%s\n", command);
+        else
+        {
+            printf("command not found:%s\n", command);
+        }
     }
-
-    // printPrompt();
 
     return 0;
 }
